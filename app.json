@@ -1,0 +1,34 @@
+{
+  "name": "Shivi X VC Music Bot",
+  "description": "Telegram VC Music Bot with Assistant Support",
+  "repository": "https://github.com/officialrohit928-lang/shivi",
+  "keywords": ["telegram", "music", "vc", "pyrogram", "pytgcalls"],
+  "env": {
+    "API_ID": {
+      "description": "Telegram API ID",
+      "required": true
+    },
+    "API_HASH": {
+      "description": "Telegram API HASH",
+      "required": true
+    },
+    "BOT_TOKEN": {
+      "description": "Telegram Bot Token",
+      "required": true
+    },
+    "SESSION_STRING": {
+      "description": "Assistant Account Session String",
+      "required": true
+    },
+    "OWNER_ID": {
+      "description": "Owner Telegram User ID",
+      "required": true
+    }
+  },
+  "formation": {
+    "worker": {
+      "quantity": 1
+    }
+  },
+  "stack": "heroku-22"
+}
