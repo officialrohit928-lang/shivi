@@ -1,4 +1,5 @@
 import os
+import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import (
     InlineKeyboardMarkup,
@@ -6,28 +7,43 @@ from pyrogram.types import (
     Message,
     CallbackQuery
 )
+from pytgcalls import PyTgCalls, idle
 
-# ───── CONFIG ─────
+# ───── ENV CONFIG ─────
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+SESSION_STRING = os.getenv("SESSION_STRING")  # assistant session
 OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 
-app = Client(
-    "shivi_music",
+# ───── BOT CLIENT ─────
+bot = Client(
+    "shivi_music_bot",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN
 )
 
+# ───── ASSISTANT CLIENT (USER) ─────
+assistant = Client(
+    session_name="shivi_assistant",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    session_string=SESSION_STRING
+)
+
+# ───── VC CLIENT ─────
+vc = PyTgCalls(assistant)
+
 # ───── START MENU ─────
 START_TEXT = """
-❖ **SHIVI X MUSIC BOT** ❖ 💖
+🎧 **SHIVI X VC MUSIC BOT** 🎶
 
-➤ Choose category for help  
-➤ All commands use with `/`
+➤ Voice chat music supported  
+➤ Assistant auto joins VC  
+➤ Use buttons for help
 
-Powered by @ShiviXMusic
+Powered by **Shivi X**
 """
 
 MAIN_MENU = InlineKeyboardMarkup([
@@ -37,95 +53,110 @@ MAIN_MENU = InlineKeyboardMarkup([
         InlineKeyboardButton("BROADCAST", callback_data="broadcast")
     ],
     [
-        InlineKeyboardButton("BLACKLIST", callback_data="blacklist"),
         InlineKeyboardButton("PLAY", callback_data="play"),
-        InlineKeyboardButton("G-BAN", callback_data="gban")
+        InlineKeyboardButton("G-BAN", callback_data="gban"),
+        InlineKeyboardButton("BLACKLIST", callback_data="blacklist")
     ],
     [
-        InlineKeyboardButton("VC-TOOLS", callback_data="vc_tools"),
+        InlineKeyboardButton("VC-TOOLS", callback_data="vc"),
         InlineKeyboardButton("LOGS", callback_data="logs"),
-        InlineKeyboardButton("START", callback_data="start_help")
+        InlineKeyboardButton("WELCOME", callback_data="welcome")
     ],
     [
-        InlineKeyboardButton("ACTION", callback_data="action"),
         InlineKeyboardButton("MODERATION", callback_data="moderation"),
+        InlineKeyboardButton("PROMOTE", callback_data="promote"),
         InlineKeyboardButton("SETUP", callback_data="setup")
-    ],
-    [
-        InlineKeyboardButton("WELCOME", callback_data="welcome"),
-        InlineKeyboardButton("VC-LOGGER", callback_data="vc_logger"),
-        InlineKeyboardButton("PROMOTE", callback_data="promote")
     ]
 ])
 
-BACK_BTN = InlineKeyboardMarkup(
+BACK = InlineKeyboardMarkup(
     [[InlineKeyboardButton("⬅️ BACK", callback_data="back")]]
 )
 
-# ───── COMMANDS ─────
-@app.on_message(filters.command("start"))
-async def start_cmd(_, message: Message):
-    await message.reply_photo(
-        photo="https://telegra.ph/file/3a0f2f5f1c4d2d1e1f5e4.jpg",
-        caption=START_TEXT,
+HELP_TEXT = {
+    "admin": "👮 Admin\n/addadmin\n/deladmin",
+    "auth": "🔐 Auth\n/auth\n/unauth",
+    "broadcast": "📢 /broadcast",
+    "play": "🎵 VC Music\n/play song\n/stop",
+    "gban": "🌍 /gban\n/ungban",
+    "blacklist": "🚫 /blacklist\n/unblacklist",
+    "vc": "🎙️ VC Tools\n/play\n/stop",
+    "logs": "📄 /logs",
+    "welcome": "👋 /setwelcome",
+    "moderation": "🛡️ /ban\n/mute",
+    "promote": "⬆️ /promote\n/demote",
+    "setup": "⚙️ /settitle"
+}
+
+# ───── START COMMAND ─────
+@bot.on_message(filters.command("start"))
+async def start(_, m: Message):
+    await m.reply(
+        START_TEXT,
         reply_markup=MAIN_MENU
     )
 
-@app.on_message(filters.command("play"))
-async def play_cmd(_, message: Message):
-    if len(message.command) < 2:
-        return await message.reply("🎵 **Song name do bhai**")
-    song = " ".join(message.command[1:])
-    await message.reply(f"▶️ **Playing:** `{song}`")
+# ───── VC PLAY ─────
+@bot.on_message(filters.command("play") & filters.group)
+async def play(_, m: Message):
+    if len(m.command) < 2:
+        return await m.reply("❌ Song name likho")
 
-@app.on_message(filters.command("pause"))
-async def pause_cmd(_, message: Message):
-    await message.reply("⏸️ Music paused")
+    chat_id = m.chat.id
+    song = " ".join(m.command[1:])
 
-@app.on_message(filters.command("resume"))
-async def resume_cmd(_, message: Message):
-    await message.reply("▶️ Music resumed")
+    await m.reply(f"🎧 **VC join ho raha hai**\n🎵 `{song}`")
 
-@app.on_message(filters.command("stop"))
-async def stop_cmd(_, message: Message):
-    await message.reply("⏹️ Music stopped")
+    try:
+        await vc.join_group_call(
+            chat_id,
+            audio="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        )
+    except Exception as e:
+        await m.reply(f"❌ VC Error:\n`{e}`")
+
+# ───── VC STOP ─────
+@bot.on_message(filters.command("stop") & filters.group)
+async def stop(_, m: Message):
+    try:
+        await vc.leave_group_call(m.chat.id)
+        await m.reply("⏹️ VC leave kar diya")
+    except:
+        await m.reply("❌ VC active nahi hai")
+
+# ───── FAKE ADMIN / OTHER COMMANDS (STRUCTURE READY) ─────
+@bot.on_message(filters.command("broadcast"))
+async def broadcast(_, m: Message):
+    if m.from_user.id != OWNER_ID:
+        return await m.reply("❌ Owner only")
+    await m.reply("📢 Broadcast sent (demo)")
+
+@bot.on_message(filters.command("gban"))
+async def gban(_, m: Message):
+    await m.reply("🚫 User globally banned (demo)")
 
 # ───── CALLBACK HANDLER ─────
-@app.on_callback_query()
-async def cb_handler(_, query: CallbackQuery):
-    data = query.data
-
-    HELP_TEXTS = {
-        "admin": "👮 **Admin Commands**\n/addadmin\n/deladmin",
-        "auth": "🔐 **Auth Commands**\n/auth\n/unauth",
-        "broadcast": "📢 **Broadcast**\n/broadcast",
-        "blacklist": "🚫 **Blacklist**\n/blacklist\n/unblacklist",
-        "play": "🎵 **Music**\n/play song\n/pause\n/resume\n/stop",
-        "gban": "🌍 **Global Ban**\n/gban\n/ungban",
-        "vc_tools": "🎙️ **VC Tools**\n/vcmute\n/vcunmute",
-        "logs": "📄 **Logs**\n/logs",
-        "start_help": "/start – Start bot",
-        "action": "⚡ **Actions**\n/pin\n/unpin",
-        "moderation": "🛡️ **Moderation**\n/ban\n/mute",
-        "setup": "⚙️ **Setup**\n/settitle\n/setphoto",
-        "welcome": "👋 **Welcome**\n/setwelcome",
-        "vc_logger": "📝 **VC Logger**\n/vclog on/off",
-        "promote": "⬆️ **Promote**\n/promote\n/demote"
-    }
-
-    if data == "back":
-        await query.message.edit_caption(
-            caption=START_TEXT,
+@bot.on_callback_query()
+async def callbacks(_, q: CallbackQuery):
+    if q.data == "back":
+        await q.message.edit(
+            START_TEXT,
             reply_markup=MAIN_MENU
         )
     else:
-        await query.message.edit_caption(
-            caption=HELP_TEXTS.get(data, "No info"),
-            reply_markup=BACK_BTN
+        await q.message.edit(
+            HELP_TEXT.get(q.data, "No data"),
+            reply_markup=BACK
         )
+    await q.answer()
 
-    await query.answer()
+# ───── MAIN RUNNER ─────
+async def main():
+    await assistant.start()
+    await vc.start()
+    await bot.start()
+    print("🔥 Shivi VC Music Bot Started")
+    await idle()
 
-# ───── RUN ─────
-print("🔥 Shivi Music Bot Started...")
-app.run()
+if __name__ == "__main__":
+    asyncio.run(main())
