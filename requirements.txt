@@ -1,6 +1,6 @@
-pyrogram==2.0.106
+pyrogram==1.4.16
 tgcrypto==1.2.5
-git+https://github.com/pytgcalls/pytgcalls@master
+pytgcalls==1.2.0
 yt-dlp
 youtube-search-python
 ffmpeg-python
