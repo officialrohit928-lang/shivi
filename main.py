@@ -7,7 +7,8 @@ from pyrogram.types import (
     Message,
     CallbackQuery
 )
-from pytgcalls import PyTgCalls, idle
+from pytgcalls import PyTgCalls
+from pyrogram import idle
 
 # ───── ENV CONFIG ─────
 API_ID = int(os.getenv("API_ID"))
